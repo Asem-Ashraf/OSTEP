@@ -6,7 +6,8 @@
 #include <ctype.h>
 #define PTR_SIZE 8
 #define PRINTABLE_NON_WHITESPACE "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+=({[,]})"
-
+int NumberOfPaths = 0;
+char** paths=NULL;  
 char error_message[30] = "An error has occurred\n";
 
 // Note: This function returns a pointer to a substring of the original string.
@@ -116,7 +117,18 @@ void lineHandler(char * command){
             }
         }
         else if (!strncmp(argv[0],"path",4)) {
-            printf("in path\n");
+            /* printf("in path\n"); */
+            paths=realloc(paths, NumberOfPaths+counter-1+1);
+
+            for (int p = NumberOfPaths ;p<NumberOfPaths+counter-1 ; p++) {
+                paths[p]=(char*)malloc(strlen(argv[p-NumberOfPaths+1])+1);
+                strcpy(paths[p],argv[p-NumberOfPaths+1]);
+            }
+            NumberOfPaths+=counter-1;
+            /* printf("%d\n",NumberOfPaths); */
+            /* for (int p = 0;p<NumberOfPaths; p++) { */
+                /* printf("%s\n",paths[p]); */
+            /* } */
             continue;
         }
         pids[i]=fork();
@@ -133,19 +145,28 @@ void lineHandler(char * command){
                     // closeCurrentlyOpenOutputStream(stdin);
                     // openThisAsTheOutputStream(ParallelCommands[i]);
                     // create the file if it does not exist
-                    printf("redirection success.\n");
+                    /* printf("redirection success.\n"); */
                     freopen(rdFile, "w", stdout);
                 }
                 else { // error occured, more than one argument after redirection
-                    printf("redirection error\n");
+                    /* printf("redirection error\n"); */
                     write(STDERR_FILENO, error_message, strlen(error_message));
                     exit(1);
                 }
             }
+            /* printf("hi"); */
             if (-1 == execv(argv[0],argv)) {
+                for (int p = 0;p<NumberOfPaths; p++) {
+                    int pathsize = strlen(paths[p])  +  strlen(argv[0]) - 1;
+                    char correctPath[pathsize];
+                    strcpy(correctPath, paths[p]);
+                    strcpy(correctPath+strlen(paths[p]), argv[0]);
+                    /* printf("%s\n",correctPath); */
+                    execv(correctPath,argv);
+                }
                 //error message
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                printf("execv error\n");
+                /* printf("execv error\n"); */
                 exit(1);
             }
         }
@@ -157,6 +178,7 @@ void lineHandler(char * command){
 
 
 int main(int argc, char **argv){
+    paths=(char**)malloc(PTR_SIZE);
     char *command = NULL;
     size_t CommandSize=0;
     if (argc==1) // Interactive mode
@@ -173,12 +195,11 @@ int main(int argc, char **argv){
     else // Batch mode 
     { 
         // open the file given in the argument and start taking the commands from it
-        for (int q;q<argc ; q++) { // For multiple files.
+        for (int q=1;q<argc ; q++) { // For multiple files.
+            FILE *script = fopen(argv[q],"r");
             for (;;) {
                 // print the prompt and ask for a line of input
-                char *command = NULL;
-                size_t CommandSize=0;
-                if (-1 == getline(&command, &CommandSize, fopen(argv[q],"r"))){exit(0);}
+                if (-1 == getline(&command, &CommandSize,script)){exit(0);}
                 lineHandler(command);
                 free(command);
                 command=NULL;
