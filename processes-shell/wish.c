@@ -6,7 +6,7 @@
 #include <ctype.h>
 #define PTR_SIZE 8
 #define PRINTABLE_NON_WHITESPACE "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+=({[,]})"
-int NumberOfPaths = 0;
+int NumberOfPaths = 1; //  "/bin/"
 char** paths=NULL;  
 char error_message[30] = "An error has occurred\n";
 
@@ -56,6 +56,7 @@ char** argumentv(char* commandUnParsed,int *counter){
           k--;
       }
   }
+  if ((*counter)==0) return NULL;
   char * * argv=(char**)malloc(((*counter+1))*PTR_SIZE);
   /* printf("%d\n",((*counter)+1)*PTR_SIZE); */
   argv[(*counter)]=(void*)0;
@@ -76,7 +77,7 @@ char** argumentv(char* commandUnParsed,int *counter){
 
 void lineHandler(char * command){
     int Parallel = count(command)+1;
-    char* ParallelCommands[Parallel];
+    char** ParallelCommands=(char**)calloc(Parallel,8);
     int i =0;
     for (i=0; i<Parallel; i++) {
         ParallelCommands[i]=strsep(&command, "&");
@@ -89,12 +90,18 @@ void lineHandler(char * command){
         char* commandUnParsed=strsep(&ParallelCommands[i], ">");
         int counter;
         char** argv=argumentv(commandUnParsed,&counter);
+        if (argv==NULL) {
+            if (ParallelCommands[i]!=NULL) {
+                write(STDERR_FILENO, error_message, strlen(error_message));
+            }
+            continue;
+        }
         if (!strncmp(argv[0],"cd",2)) {
             /* printf("in cd %d \n",counter); */
             if (counter!=2) {
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    /* printf("error cd\n"); */
-                    continue;
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                /* printf("error cd\n"); */
+                continue;
             }
             else {
                 if (-1==chdir(argv[1])) {
@@ -118,13 +125,38 @@ void lineHandler(char * command){
         }
         else if (!strncmp(argv[0],"path",4)) {
             /* printf("in path\n"); */
+                    // algorithm for test case 7
+                    // free every location 
+                    // free paths itself
+                    // then set NumberOfPaths to counter-1
+                    // then dynamically allocate paths again with the new NumberOfPaths
+                    // then start the for loop from p = 0
+                    // till p = NumberOfPaths
+                    // every run allocate space to paths[p]= strlen(argv[p+1])+1+1
+            for (int f = 0 ; f <NumberOfPaths; f++) {
+                free(paths[f]);
+            }
+            free(paths);
+            NumberOfPaths=counter-1;
+            paths=(char**)malloc(NumberOfPaths*PTR_SIZE);
+
+            for (int p = 0;p<NumberOfPaths; p++) {
+                paths[p]=(char*)malloc(strlen(argv[p+1])+1+1);
+                strcpy(paths[p],argv[p+1]);
+                strcat(paths[p],"/");
+            }
+
+
+            /*
             paths=realloc(paths, NumberOfPaths+counter-1+1);
 
             for (int p = NumberOfPaths ;p<NumberOfPaths+counter-1 ; p++) {
-                paths[p]=(char*)malloc(strlen(argv[p-NumberOfPaths+1])+1);
+                paths[p]=(char*)malloc(strlen(argv[p-NumberOfPaths+1])+1+1);
                 strcpy(paths[p],argv[p-NumberOfPaths+1]);
+                strcat(paths[p],"/");
             }
             NumberOfPaths+=counter-1;
+            */
             /* printf("%d\n",NumberOfPaths); */
             /* for (int p = 0;p<NumberOfPaths; p++) { */
                 /* printf("%s\n",paths[p]); */
@@ -157,10 +189,15 @@ void lineHandler(char * command){
             /* printf("hi"); */
             if (-1 == execv(argv[0],argv)) {
                 for (int p = 0;p<NumberOfPaths; p++) {
-                    int pathsize = strlen(paths[p])  +  strlen(argv[0]) - 1;
+                    /* int pathsize = strlen(paths[p])  +  strlen(argv[0]); */
+                    int pathsize = strlen(paths[p])  +  strlen(argv[0]-1);
                     char correctPath[pathsize];
                     strcpy(correctPath, paths[p]);
                     strcpy(correctPath+strlen(paths[p]), argv[0]);
+                    /* strcpy(correctPath,"/"); 
+                    * strcpy(correctPath+1, paths[p]); 
+                    * strcpy(correctPath+strlen(paths[p])+1, argv[0]);*/
+
                     /* printf("%s\n",correctPath); */
                     execv(correctPath,argv);
                 }
@@ -179,6 +216,9 @@ void lineHandler(char * command){
 
 int main(int argc, char **argv){
     paths=(char**)malloc(PTR_SIZE);
+    char* defaultLocation=(char*)malloc(strlen("/bin/")+1);
+    strcpy(defaultLocation,"/bin/");
+    paths[0]=defaultLocation;
     char *command = NULL;
     size_t CommandSize=0;
     if (argc==1) // Interactive mode
@@ -194,17 +234,22 @@ int main(int argc, char **argv){
     }
     else // Batch mode 
     { 
+        if (argc>2) {
+             write(STDERR_FILENO, error_message, strlen(error_message));
+             exit(1);
+        }
         // open the file given in the argument and start taking the commands from it
-        for (int q=1;q<argc ; q++) { // For multiple files.
-            FILE *script = fopen(argv[q],"r");
-            for (;;) {
-                // print the prompt and ask for a line of input
-                if (-1 == getline(&command, &CommandSize,script)){exit(0);}
-                lineHandler(command);
-                free(command);
-                command=NULL;
-            }
-        
+        FILE *script = fopen(argv[1],"r");
+        if (script==NULL) {
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            exit(1);
+        }
+        for (;;) {
+            // print the prompt and ask for a line of input
+            if (-1 == getline(&command, &CommandSize,script)){exit(0);}
+            lineHandler(command);
+            free(command);
+            command=NULL;
         }
     }
 }
