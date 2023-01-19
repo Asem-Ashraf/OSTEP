@@ -5,7 +5,7 @@ if ! [[ -x wgrep ]]; then
     exit 1
 fi
 
-../run-tests.sh $*
+../../run-tests.sh $*
 
 
 
