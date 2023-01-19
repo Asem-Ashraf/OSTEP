@@ -72,7 +72,7 @@ char** argumentv(char* commandUnParsed){
 }
 
 void lineHandler(char * command){
-    char** built_inArgv=argumentv(command);
+    /*char** built_inArgv=argumentv(command);
     if (!strcmp(built_inArgv[0],"cd")) {
         if (strlen((char*)built_inArgv)!=1) {
                 write(STDERR_FILENO, error_message, strlen(error_message));
@@ -91,7 +91,7 @@ void lineHandler(char * command){
     }
     else if (!strcmp(built_inArgv[0],"path")) {
 
-    }
+    }*/
 
 
 
