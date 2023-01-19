@@ -9,6 +9,6 @@ In the hope to do all of them...
 
 Initial Utilities: Done.
 
-Process Shell: N/A
+Process Shell: Done.
 
 Initial xv6: Understood, waiting for conncurency part.
