@@ -134,7 +134,9 @@ lineHandler(char* command){
             continue;
         }
 
-        // Check for built-in commands.
+        /* * * * * * * * * * * * * * * * 
+         * Check for built-in commands.*
+         * * * * * * * * * * * * * * * */
 
         // cd command.
         if (!strncmp(argv[0],"cd",2)) {
@@ -170,6 +172,7 @@ lineHandler(char* command){
                 continue;
             }
         }
+        // path command.
         else if (!strncmp(argv[0],"path",4)) {
             // Everytime path is called the old paths should be cleared and 
             // replaced with the new paths.
@@ -216,8 +219,11 @@ lineHandler(char* command){
 
         // If the command is not a built-in command, then fork and execute it.
 
-        // Save the pid of the fork
-        pids[i]=fork();
+        /* * * * * * * * * * * * * * *
+         * Save the pid of the fork  */
+           pids[i]=fork();
+        /* * * * * * * * * * * * * * */
+
         if (pids[i]==0)
         {
             // if there is any redirection with the command.
