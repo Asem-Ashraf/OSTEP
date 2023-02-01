@@ -59,7 +59,7 @@ count(const char* commands){
 
 
 
-// Funtion to extract argv from a string of characters.
+// Funtion to extract argv and argc from a string of characters.
 // Input:-
 //          commandUnParsed: The unparsed string of character
 //                           that contain the command and its
@@ -211,7 +211,7 @@ lineHandler(char* command){
                 strcat(paths[p],"/");
             }
 
-            // Another algorithm to add the new paths to the old path rather than re writing them.
+            // Another algorithm to add the new paths to the old path rather than re-writing them.
             /*
             paths=realloc(paths, NumberOfPaths+argc-1+1);
 
