@@ -40,15 +40,24 @@ trimwhitespace(char *str){
     return str;
 }
 
+
+
+// Funtion to count the number of the parallel commands from the command line string.
+// Input:-
+//          commands         : The command line string.
+// Output:-
+//          ParallelCommands : The argument vector.
 int
-count(const char* command){
-    int argc=0;
-    while(*command != '\0'){
-        if (*command == '&') argc++;
-        command++;
+count(const char* commands){
+    int ParallelCommands=0;
+    while(*commands != '\0'){ // As long as we did not reach the end of the string.
+        if (*commands == '&') ParallelCommands++;
+        commands++;// Test next character.
     }
-    return argc;
+    return ParallelCommands;
 }
+
+
 
 // Funtion to extract argv from a string of characters.
 // Input:-
