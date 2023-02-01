@@ -1,6 +1,6 @@
 # OSTEP
 
-This repo is for the Operating Systems Three Easy Pieces course.
+This repository holds a number of projects that can be used in an operating systems class aimed at upper-level undergraduates and (in some cases) beginning graduate students. They are based on years of teaching such a course at the University of Wisconsin-Madison.
 
 It contains the projects that I have done from the course.
 
