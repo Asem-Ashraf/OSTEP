@@ -8,7 +8,7 @@
 #define NULL_CHAR_PADDING 1
 #define SLASH_CHAR_PADDING 1
 #define PTR_SIZE 8
-#define PRINTABLE_NON_WHITESPACE "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-+*=({[</|\\>]})"
+#define PRINTABLE_NON_WHITESPACE "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.;:,-+*?!@#$%^~`'\"=({[</|\\>]})"
 
 int NumberOfPaths = 1; //  "/bin/"
 char** paths=NULL;  
@@ -22,22 +22,22 @@ char error_message[30] = "An error has occurred\n";
 // value must NOT be deallocated using free() etc.
 char*
 trimwhitespace(char *str){
-  char *end;
+    char *end;
 
-  // Trim leading space
-  while(isspace((unsigned char)*str)) str++;
+    // Trim leading space
+    while(isspace((unsigned char)*str)) str++;
 
-  if(*str == 0)  // All spaces?
+    if(*str == 0)  // All spaces?
+        return str;
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator character
+    end[1] = '\0';
+
     return str;
-
-  // Trim trailing space
-  end = str + strlen(str) - 1;
-  while(end > str && isspace((unsigned char)*end)) end--;
-
-  // Write new null terminator character
-  end[1] = '\0';
-
-  return str;
 }
 
 int
@@ -67,14 +67,14 @@ argumentv(char* commandUnParsed,int *argc){
     for (int k = 0 ; k<maxlen; k++) {
         if (isspace(*commandUnParsedCopy)) commandUnParsedCopy++;
         else{
-          (*argc)++;
-          while (!isspace(*commandUnParsedCopy)) {commandUnParsedCopy++;k++;}
-          k--;
+            (*argc)++;
+            while (!isspace(*commandUnParsedCopy)) {commandUnParsedCopy++;k++;}
+            k--;
         }
     }
     if ((*argc)==0) return NULL;
     char * * argv=(char**)malloc(((*argc+1))*PTR_SIZE);
-     argv[(*argc)]=(void*)0;
+    argv[(*argc)]=(void*)0;
     (*argc)=0;
     commandUnParsedCopy = commandUnParsed;
     for (int k = 0 ; k<maxlen; k++) {
@@ -112,7 +112,7 @@ lineHandler(char* command){
     for (int i=0; i<Parallel; i++) {
         // Check for redirection
         char* commandUnParsed=strsep(&ParallelCommands[i], ">");
-        
+
         // Each time a command is going to be parsed, it will use this variable as its argc.
         int argc;
 
@@ -157,14 +157,14 @@ lineHandler(char* command){
             }
         }
 
-        // exit command.
+            // exit command.
         else if (!strncmp(argv[0],"exit",4)) {
             // exit does not accept any arguments. If arguments are given, 
             // it is an error.
             if (argc>1) {
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    // Stop processing this command and continue to the next.
-                    continue;
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                // Stop processing this command and continue to the next.
+                continue;
             }
             else {
                 // exit call successful.
@@ -172,7 +172,7 @@ lineHandler(char* command){
                 continue;
             }
         }
-        // path command.
+            // path command.
         else if (!strncmp(argv[0],"path",4)) {
             // Everytime path is called the old paths should be cleared and 
             // replaced with the new paths.
@@ -221,7 +221,7 @@ lineHandler(char* command){
 
         /* * * * * * * * * * * * * * *
          * Save the pid of the fork  */
-           pids[i]=fork();
+        pids[i]=fork();
         /* * * * * * * * * * * * * * */
 
         if (pids[i]==0)
@@ -290,30 +290,30 @@ main(int argc, char **argv){
     size_t CommandSize=0;
 
     if (argc==1) // Interactive mode
-    {
-        for (;;) {
-            // print the prompt and ask for a line of input
-            printf("wish> ");
-            // if getline ever fails the shell should exit with the common error message.
-            if (-1 == getline(&command, &CommandSize,stdin)){
-                write(STDERR_FILENO, error_message, strlen(error_message));
-                exit(EXIT_FAILURE);
+        {
+            for (;;) {
+                // print the prompt and ask for a line of input
+                printf("wish> ");
+                // if getline ever fails the shell should exit with the common error message.
+                if (-1 == getline(&command, &CommandSize,stdin)){
+                    write(STDERR_FILENO, error_message, strlen(error_message));
+                    exit(EXIT_FAILURE);
+                }
+                // Handle the command.
+                lineHandler(command);
+                // free the space of the executed command.
+                free(command);
+                // set the command to NULL so that getline() allocates new block of memory.
+                command=NULL;
             }
-            // Handle the command.
-            lineHandler(command);
-            // free the space of the executed command.
-            free(command);
-            // set the command to NULL so that getline() allocates new block of memory.
-            command=NULL;
         }
-    }
     else // Batch mode 
     { 
         if (argc>2) {  
-             // if the shell is called with more than one file argument,
-             // exit with error.
-             write(STDERR_FILENO, error_message, strlen(error_message));
-             exit(EXIT_FAILURE);
+            // if the shell is called with more than one file argument,
+            // exit with error.
+            write(STDERR_FILENO, error_message, strlen(error_message));
+            exit(EXIT_FAILURE);
         }
         // open the file given in the argument and start taking the commands from it
         FILE *script = fopen(argv[1],"r");
