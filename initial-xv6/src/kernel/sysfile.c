@@ -16,7 +16,6 @@
 #include "kernel/fcntl.h"
 
 struct spinlock lock;
-// pthread_mutex_t lock = PTHREAD_MUTEX_INTIALIZER;
 unsigned long long readcount = 0;
 unsigned long long sys_getreadcount(void) { return readcount; }
 
