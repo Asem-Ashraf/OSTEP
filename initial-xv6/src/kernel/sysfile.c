@@ -4,6 +4,7 @@
 // user code, and calls into file.c and fs.c.
 //
 
+#include "kernel/spinlock.h"
 #include "kernel/types.h"
 #include "kernel/defs.h"
 #include "kernel/param.h"
@@ -14,7 +15,7 @@
 #include "kernel/file.h"
 #include "kernel/fcntl.h"
 
-// #include <pthread.h>
+struct spinlock lock;
 // pthread_mutex_t lock = PTHREAD_MUTEX_INTIALIZER;
 unsigned long long readcount = 0;
 unsigned long long sys_getreadcount(void) { return readcount; }
@@ -66,9 +67,10 @@ int sys_read(void) {
   struct file *f;
   int n;
   char *p;
-  // pthread_mutex_lock(&lock);
+  if (readcount==0) initlock(&lock,"getreadcountLock"); 
+  acquire(&lock);
   readcount++;
-  // pthread_mutex_unlock(&lock);
+  release(&lock);
 
   if (argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
