@@ -34,12 +34,12 @@ If you are using Windows 10 or 11 , you can use the Windows Subsystem for Linux 
 $ make run
 ```
 
-## Testing
+## Test
 
 ```
 $ make run-test
 ```
-## Cleaning
+## Clean
 ```
 $ make clean
 ```
