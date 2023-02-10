@@ -18,13 +18,13 @@ This program follows all the specifications [here](https://github.com/remzi-arpa
 
 ## Build
 
-### Linux / MacOS
+#### Linux / MacOS
 
 ```
 $ make
 ```
 
-### Windows
+#### Windows
 
 If you are using Windows 10 or 11 , you can use the Windows Subsystem for Linux (WSL) to be able to use unix utilities [Install WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
 
