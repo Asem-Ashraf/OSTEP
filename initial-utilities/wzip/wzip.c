@@ -1,96 +1,75 @@
 #include <stdio.h>
 #include <stdlib.h>
-int main(int argc, char const *argv[])
-{
-    if (argc ==1 )
-    {
+#include <assert.h>
+
+void zip(int cross_fileCounter,char prevLetter){
+    int rc;
+    rc=fwrite(&cross_fileCounter,sizeof(int),1,stdout);
+    assert(rc==1);
+    rc=fwrite(&prevLetter,sizeof(char),1,stdout);
+    assert(rc==1);
+}
+void printError(){
+    printf("wzip: cannot open file\n");
+    exit(1);
+}
+FILE* FopenWrapper(const char* fileName,const char* modes){
+    FILE* pFile = fopen(fileName,modes);
+    // Error checking.
+    if (pFile==NULL) printError();
+    return pFile;
+}
+int main(int argc, char const *argv[]) {
+    if (argc == 1 ) {
         printf("wzip: file1 [file2 ...]\n");
         exit(1);
     }
-    FILE* ham=NULL;
-    char *buffer=NULL;
-    size_t linebufsize=0;
-    int linesize=0;
-    
-    for (size_t i = 1; i < argc; i++)
-    {
-        ham = fopen(argv[i],"r");
-        if (ham==NULL)
-        {
-            printf("wzip: cannot open file\n");
-            exit(1);
-        }
-        char theLetter;
-        int county;
-        int flag=0;
-        while (linesize=getline(&buffer,&linebufsize,ham),linesize!=-1){
+    FILE* pFile=NULL;
+    char *line=NULL;
+    size_t lineSize=0;
+    for (int i = 1; i < argc; i++) {
+        pFile = FopenWrapper(argv[i],"r");
+        char prevLetter;
+        int cross_fileCounter;
+        int newLineFlag=0;
+        while (getline(&line,&lineSize,pFile)!=-1){
             int counter=1;
-            if(flag){
-                if (theLetter==buffer[0])
-                {
-                    counter+=county;county=0;
-                }
-                else{
-                    fwrite(&county,sizeof(int),1,stdout);
-                    fwrite(&theLetter,sizeof(char),1,stdout);
-                    county = 0;
-                }
-                flag=0;
+            if(newLineFlag){
+                if (prevLetter==line[0]) counter+=cross_fileCounter; 
+                else zip(cross_fileCounter,prevLetter);
+                cross_fileCounter=0;
+                newLineFlag=0;
             }
-            for (size_t k = 0; k < linesize; k++)
-            {
-                if (buffer[k]==buffer[k+1])
-                {
-                    counter++;
-                }
-                else
-                {
-                    if (buffer[k+1]=='\0')
-                    {
-                        if (linesize==1)
-                        {
-                            
-                        }
-                        
-                        //printf("hi");
-                        theLetter=buffer[k];
-                        county=counter;
-                        if (feof(ham)!=0)
-                        {
-                            if (i<argc-1)
-                            {
+            for (size_t k = 0; k < lineSize; k++) {
+                if (line[k]==line[k+1]) counter++;
+                else {
+                    // End of Line reached
+                    if (line[k+1]=='\0') {
+                        prevLetter=line[k];
+                        cross_fileCounter=counter;
+                        newLineFlag=1;
+                        // If End of File reached
+                        if (feof(pFile)!=0) {
+                            // If there are more files to be zipped
+                            if (i<argc-1) {
                                 i++;
-                                fclose(ham);
-                                ham = fopen(argv[i],"r");
-                                if (ham==NULL)
-                                {
-                                    printf("wzip: cannot open file\n");
-                                    exit(1);
-                                }
-                                flag=1;
+                                // Close the current file and open the next file.
+                                fclose(pFile);
+                                pFile = FopenWrapper(argv[i],"r");
                             }
-                            else{
-                                fwrite(&counter,sizeof(int),1,stdout);
-                                fwrite(&buffer[k],sizeof(char),1,stdout);
-                            }
+                            else zip(counter,line[k]);
                         }
-                        else flag=1;
                         break;
                     }
-                    fwrite(&counter,sizeof(int),1,stdout);
-                    fwrite(&buffer[k],sizeof(char),1,stdout);
+                    zip(counter, line[k]);
                     counter = 1;
                 }
             }
-            free(buffer); buffer=NULL;
+            free(line);
+            line=NULL;
         }
-        if (theLetter=='\n')
-        {
-                                fwrite(&county,sizeof(int),1,stdout);
-                                fwrite(&theLetter,sizeof(char),1,stdout);
-        }
-        
-        fclose(ham);
+        if (prevLetter=='\n') zip(cross_fileCounter,prevLetter);
+        fclose(pFile);
     }
     return 0;
 }
