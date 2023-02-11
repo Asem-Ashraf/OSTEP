@@ -1,5 +1,7 @@
 PROG = wish
+TSTSCRPT = test-$(PROG).sh
 NMPTRN = w*sh
+TSTPTRN = test-*.sh
 executable = $(wildcard $(NMPTRN))
 test-out-dir = $(wildcard tests-*)
 
@@ -13,12 +15,13 @@ endif
 run: $(PROG)
 	./$(PROG)
 
-run-test: test-wish.sh
-	@./test-$(PROG).sh -c
+run-test: $(PROG)
+ifeq ($(wildcard $(TSTPTRN)),$(TSTSCRPT))
+	@./$(TSTSCRPT) -c
 	@echo =======Done Testing=======
-
-test-wish.sh:
-	@echo "test-$(PROG).sh" not found.
+else
+	@echo \"$(TSTSCRPT)\" not found.
+endif
 
 clean:
 ifeq ($(executable),$(PROG))
