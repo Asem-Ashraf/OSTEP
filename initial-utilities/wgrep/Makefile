@@ -1,10 +1,28 @@
-PROG= wgrep
-executable = $(wildcard w*rep)
+PROG = wgrep
+NMPTRN = w*rep
+TSTSCRPT = test-$(PROG).sh
+TSTPTRN = test-*.sh
+executable = $(wildcard $(NMPTRN))
 test-out-dir = $(wildcard tests-*)
-$(PROG): $(wildcard w*.c)
-	gcc -Wall -Werror $? -o $@
+
+$(PROG):
+ifeq ($(wildcard $(NMPTRN).c),$(PROG).c)
+	gcc -Wall -Werror $(PROG).c -o $@
+else
+	@echo \"$(PROG).c\" not found.
+endif
+
+run: $(PROG)
+	./$(PROG)
+
 run-test: $(PROG)
-	./test-$^.sh -c
+ifeq ($(wildcard $(TSTPTRN)),$(TSTSCRPT))
+	@./$(TSTSCRPT) -c
+	@echo =======Done Testing=======
+else
+	@echo \"$(TSTSCRPT)\" not found.
+endif
+
 clean:
 ifeq ($(executable),$(PROG))
 	rm $(PROG)
