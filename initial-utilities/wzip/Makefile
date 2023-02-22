@@ -5,7 +5,7 @@ TSTPTRN = test-*.sh
 executable = $(wildcard $(NMPTRN))
 test-out-dir = $(wildcard tests-*)
 
-$(PROG):
+$(PROG):$(PROG).c
 ifeq ($(wildcard $(NMPTRN).c),$(PROG).c)
 	gcc -Wall -Werror $(PROG).c -o $@
 else
