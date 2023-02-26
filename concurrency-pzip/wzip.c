@@ -9,6 +9,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+
 #define INT_SIZE 4
 #define CHAR_SIZE 1
 #define MIN_CHUNK_SIZE 100
@@ -21,35 +22,36 @@ unsigned int globalProcessedCount = 0;
 unsigned int globalChunkCount= 0;
 unsigned int globalfilecount = 0;
 unsigned int globalcount = 0;
+unsigned int allowedChunksAtATime = MAX_PRODUCER; // the maximum number of chunks that can be allocated at the same time.
 
-unsigned int allowedChunksAtATime = MAX_PRODUCER;
+
 pthread_mutex_t doneLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t doneCV = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t makeChunkLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t doneCV = PTHREAD_COND_INITIALIZER;
 pthread_cond_t makeChunkCV = PTHREAD_COND_INITIALIZER;
 
 typedef struct 
 chunk {
-    char *start;           // start of the chunk uncompressed
-    char *compressed;      // compressed chunk
+    char*                start;           // start of the chunk uncompressed
+    char*                compressed;      // compressed chunk
     unsigned long long   first_count;     // number of times the first character appears
     unsigned long long   last_count;      // number of times the last character appears
-    unsigned int compressed_size; // size of the compressed chunk
-    unsigned int   size;            // number of bytes of the chunk
-    unsigned int   changes;         // how many times the character changed
-    unsigned int   done;
-    char  first;           // first character in the chunk
-    char  last;            // lat character in the chunk
+    unsigned int         compressed_size; // size of the compressed chunk
+    unsigned int         size;            // number of bytes of the chunk
+    unsigned int         changes;         // how many times the character changed
+    unsigned int         done;            // if the chunk is done compressing
+    char                 first;           // first character in the chunk
+    char                 last;            // lat character in the chunk
 }chunk;
 
 typedef struct 
 file_t{
-    char* file;
-    chunk* chunks;
-    unsigned long long chunkcount;
-    unsigned long long size;
-    unsigned int   chunksize;
-    int   fd;
+    char*               file;
+    chunk*              chunks;
+    unsigned long long  chunkcount;
+    unsigned long long  size;
+    unsigned int        chunksize;
+    int                 fd;
 }file;
 
 void 
@@ -60,48 +62,52 @@ compress_chunk(chunk *c) {
             count++;
         }
         else { // Not the last character but the next character is different.
-            c->changes++;
-            memcpy(c->compressed+c->compressed_size, &count, INT_SIZE);
-            c->compressed_size += INT_SIZE;
-            memcpy(c->compressed+c->compressed_size, &c->start[i], CHAR_SIZE);
-            c->compressed_size += CHAR_SIZE;
+            c->changes++;// increment the number of character changes. if == 0, then the chunk is all the same character.
+            memcpy(c->compressed+c->compressed_size, &count, INT_SIZE);// copy the count of the character
+            c->compressed_size += INT_SIZE;// increment the compressed size
+            memcpy(c->compressed+c->compressed_size, &c->start[i], CHAR_SIZE);// copy the character
+            c->compressed_size += CHAR_SIZE;// increment the compressed size
             count = 1; // reset the count
         }
         if (c->changes == 0){ // if on first character, keep saving the count of the first character
             c->first_count = count;
         }
     }
+    // copy the last character
     c->last = c->start[c->size-1];
     c->last_count = count;
     memcpy(c->compressed+c->compressed_size, &c->last_count, INT_SIZE);
     c->compressed_size += INT_SIZE;
     memcpy(c->compressed+c->compressed_size, &c->last, CHAR_SIZE);
     c->compressed_size += CHAR_SIZE;
+
+    // mark the chunk as done
     pthread_mutex_lock(&doneLock);
     c->done = 1;
-    pthread_cond_signal(&doneCV);
+    pthread_cond_signal(&doneCV); // signal that a chunk is done
     pthread_mutex_unlock(&doneLock);
 }
 
-// mutex
+// mutex for producer consumer threads.
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t empty= PTHREAD_COND_INITIALIZER;
 pthread_cond_t fill= PTHREAD_COND_INITIALIZER;
 
-
+// queue and its variables for producer consumer threads.
 chunk* queue[MAX_QUEUE_SIZE];
 int useptr = 0;
 int fillptr = 0;
 int numfull = 0;
 
 void AddToQueue(chunk *c) {
-    // add chunk to a queue
+    // add chunk to a queue (atomic)
     queue[fillptr] = c;
     fillptr = (fillptr + 1) % MAX_QUEUE_SIZE;
     numfull++;
 }
 
 chunk* RemoveFromQueue() {
+    // remove chunk from a queue (atomic)
     chunk *c = queue[useptr];
     useptr = (useptr + 1) % MAX_QUEUE_SIZE;
     numfull--;
@@ -111,18 +117,21 @@ chunk* RemoveFromQueue() {
 
 void* producer(file* file) {
     for (int i=0; i<file->chunkcount; i++) {
+        
         pthread_mutex_lock(&makeChunkLock);
         while(allowedChunksAtATime == 0 ) {
+            // wait until a chunk is freed.
             pthread_cond_wait(&makeChunkCV, &makeChunkLock);
         }
         allowedChunksAtATime--;
         pthread_mutex_unlock(&makeChunkLock);
+
         // initialize each chunk
         if (file->size>=(i+1)*file->chunksize) file->chunks[i].size = file->chunksize; // assign a full sized chunk
         else{ 
-            file->chunks[i].size = file->size - (i * file->chunksize); // assign the last chunk the remaining size
+            file->chunks[i].size = file->size - (i * file->chunksize); // assign the remaining size to the last chunk 
         }
-        file->chunks[i].compressed = (char *)malloc((INT_SIZE+CHAR_SIZE)*file->chunks[i].size); // the maximum size of the compressed chunk
+        file->chunks[i].compressed = (char *)malloc((INT_SIZE+CHAR_SIZE)*file->chunks[i].size); // the maximum size of a compressed chunk
         assert(file->chunks[i].compressed != NULL);
         file->chunks[i].compressed_size = 0;
         file->chunks[i].first =file->file[i*file->chunksize];
@@ -135,6 +144,7 @@ void* producer(file* file) {
         // push the chunk to the queue.
         pthread_mutex_lock(&mutex);
         while (numfull == MAX_QUEUE_SIZE) {
+            // wait for the queue to have space
             pthread_cond_wait(&empty, &mutex);
         }
         // add chunk to a queue
@@ -149,7 +159,7 @@ void* consumer(void* args) {
     while (1) {
         pthread_mutex_lock(&mutex);
         while (numfull == 0) {
-            if ((globalProcessedCount == globalChunkCount)&&(globalChunkCount!=0)&&(globalfilecount==0)) {
+            if ((globalProcessedCount == globalChunkCount)&&(globalChunkCount!=0)&&(globalfilecount==0)) { // if all chunks from all files are processed
                 pthread_mutex_unlock(&mutex);
                 goto all_done;
             }
@@ -163,8 +173,8 @@ void* consumer(void* args) {
         compress_chunk(c);
     }
 all_done:
-    pthread_cond_broadcast(&fill);
-    pthread_cond_signal(&doneCV);
+    pthread_cond_broadcast(&fill);// signal all consumers to exit
+    pthread_cond_signal(&doneCV);// signal all to main thread that all chunks are done
     return NULL;
 }
 
@@ -215,6 +225,8 @@ main(int argc, char *argv[]){
                  files[i].fd,// the file descriptor
                  0);         // the offset of the file.
         assert(files[i].file != MAP_FAILED);
+
+        // Calculate the chunk size and chunk count
         if (files[i].size/ (MIN_CHUNK_SIZE) <= 1) {
             files[i].chunkcount = 1;
             files[i].chunksize = files[i].size;
@@ -228,6 +240,7 @@ main(int argc, char *argv[]){
             }
             files[i].chunksize = MIN_CHUNK_SIZE;
         }
+
         // Array of chunks
         files[i].chunks = (chunk *)malloc(sizeof(chunk)*files[i].chunkcount);
         assert(files[i].chunks != NULL);
@@ -236,47 +249,49 @@ main(int argc, char *argv[]){
         int rc = pthread_create(&pid[i], NULL, (void*)producer, &files[i]);
         assert(rc == 0);
     }
+    // writing all chunks to stdout
     for (int i = 0 ; i<argc-1; i++){ // for every file
-        for (unsigned long long k=0; k<files[i].chunkcount; k++) {                                       // for every chunk in that file
+        for (unsigned long long k=0; k<files[i].chunkcount; k++) { // for every chunk in that file
             pthread_mutex_lock(&doneLock);
-            while(files[i].chunks[k].done == 0 ) {
+            while(files[i].chunks[k].done == 0 ) { // wait for the chunk to be done
                 pthread_cond_wait(&doneCV, &doneLock);
             }
             pthread_mutex_unlock(&doneLock);
-            if (files[i].chunks[k].changes== 0) {
+            if (files[i].chunks[k].changes== 0) { // if no changes in the chunk, unit the first and last character counts
                 files[i].chunks[k].last_count= files[i].chunks[k].first_count;
             }
 
             for (int l=0; l<files[i].chunks[k].compressed_size-(INT_SIZE+CHAR_SIZE);l+=5) { // print the compressed chunk except the last count
-                Fwrite(*(int*)(files[i].chunks[k].compressed+l),
+                Fwrite(*(int*)(files[i].chunks[k].compressed+l),                            // if there is no change, nothing will be printed.
                        *(char*)(files[i].chunks[k].compressed+INT_SIZE+l));
             }
-            if(k<files[i].chunkcount-1){                                    // no changes, not the last file but not the last chunk in the file
+            if(k<files[i].chunkcount-1){                                    // if not the last chunk in the file
                 pthread_mutex_lock(&doneLock);
-                while(files[i].chunks[k+1].done == 0 ) {
+                while(files[i].chunks[k+1].done == 0 ) { // wait for the next chunk to be done
                     pthread_cond_wait(&doneCV, &doneLock);
                 }
                 pthread_mutex_unlock(&doneLock);
-                if (files[i].chunks[k+1].first==files[i].chunks[k].last) { // if the next chunk in the file has the same first letter
+                if (files[i].chunks[k+1].first==files[i].chunks[k].last) { // if the first letter of the next chunk is the same as the last letter of the current chunk
                     files[i].chunks[k+1].first_count += files[i].chunks[k].last_count; 
                     memcpy(files[i].chunks[k+1].compressed, &files[i].chunks[k+1].first_count, INT_SIZE);
                 }
-                else {                                                      // if the next chunk in the file has a different first letter
+                else {
                     Fwrite(files[i].chunks[k].last_count, files[i].chunks[k].last); 
                 }
             }
-            else {                                                          // if not last file but last chunk
+            else {                                                          //if last chunk
                 if (i<argc-1-1) {                                           // if not last file
                     pthread_mutex_lock(&doneLock);
                     while(files[i+1].chunks[0].done == 0 ) {
+                        // wait for the first chunk of the next file to be done
                         pthread_cond_wait(&doneCV, &doneLock);
                     }
                     pthread_mutex_unlock(&doneLock);
-                    if (files[i+1].chunks[0].first==files[i].chunks[k].last) { // if the first chunk in the next file has the same first letter
+                    if (files[i+1].chunks[0].first==files[i].chunks[k].last) { // if the first letter of the first chunk of the next file is the same as the last letter of the current chunk
                         files[i+1].chunks[0].first_count += files[i].chunks[k].last_count; 
                         memcpy(files[i+1].chunks[0].compressed, &files[i+1].chunks[0].first_count, INT_SIZE);
                     }
-                    else {                                                      // if the first chunk in the next file has a different first letter
+                    else {
                         Fwrite(files[i].chunks[k].last_count, files[i].chunks[k].last); 
                     }
                 }
@@ -284,8 +299,9 @@ main(int argc, char *argv[]){
                     Fwrite(files[i].chunks[k].last_count, files[i].chunks[k].last); 
                 }
             }
-            free(files[i].chunks[k].compressed);
+            free(files[i].chunks[k].compressed); // free the compressed chunk
             pthread_mutex_lock(&makeChunkLock);
+            // signal the producer that the chunk is freed and can be used again
             allowedChunksAtATime++;
             pthread_cond_signal(&makeChunkCV);
             pthread_mutex_unlock(&makeChunkLock);
