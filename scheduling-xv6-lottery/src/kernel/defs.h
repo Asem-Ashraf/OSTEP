@@ -2,6 +2,7 @@
 #define XV6_DEFS_H
 
 #include "types.h"
+#include "pstat.h"
 
 struct buf;
 struct context;
@@ -123,6 +124,7 @@ void userinit(void);
 int wait(void);
 void wakeup(void*);
 void yield(void);
+int getpinfo(struct pstat *);
 
 // swtch.S
 void swtch(struct context**, struct context*);
