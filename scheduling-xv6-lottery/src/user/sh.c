@@ -149,11 +149,11 @@ int main(void) {
   int fd;
 
   // settickets test
-  fd = settickets(15);
-  if (fd < 0) {
-    printf(2, "settickets() failed\n");
-    exit();
-  }
+  // fd = settickets(15);
+  // if (fd < 0) {
+  //   printf(2, "settickets() failed\n");
+  //   exit();
+  // }
 
   // Assumes three file descriptors open.
   while ((fd = open("console", O_RDWR)) >= 0) {

@@ -149,8 +149,9 @@ UPROGS=\
 	$U/_usertests\
 	$U/_wc\
 	$U/_zombie\
+	$U/_t\
+	$U/_ps\
 	# $U/_sizes\
-	# $U/_ps\
 
 fs.img: mkfs/mkfs README.md $(UPROGS)
 	./mkfs/mkfs fs.img README.md $(UPROGS)

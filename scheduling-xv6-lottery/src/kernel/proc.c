@@ -7,13 +7,32 @@
 #include "kernel/types.h"
 #include "kernel/x86.h"
 
-#define RAND_MAX 32767
-static unsigned long int next = 1;
-/* RAND-W assumed to be 32767 */
-uint rand(void){
-    next = next * 1103515245 + 12345;
-    return (uint) (next/65536) % (RAND_MAX+1);
+// Constants used in the random number generation algorithm
+#define A 1103515245
+#define C 12345
+#define M 2147483648
+
+// The seed value for the random number generator
+static unsigned long int seed = 1;
+
+// Generate a random number between min and max (inclusive)
+uint getRandomNumber(uint min, uint max) {
+    // Calculate a new seed value based on the current seed
+    seed = (A * seed + C) % M;
+    
+    // Calculate the range of the random number
+    int range = max - min + 1;
+    
+    // Generate a random number within the specified range
+    return min + seed % range;
 }
+// #define RAND_MAX 32767
+// static unsigned long int next = 1;
+// /* RAND-W assumed to be 32767 */
+// unsigned long int rand(void){
+//     next = next * 110245 + 12345;
+//     return (next/655);
+// }
 
 struct ptable ptable;
 
@@ -257,9 +276,9 @@ int wait(void) {
 void scheduler(void) {
   struct proc* p;
   int foundproc = 1;
-  uint activeTickets = 0;
-  uint winner = 0;
-  uint temp = 0;
+  unsigned long int activeTickets = 0;
+  unsigned long int winner = 0;
+  unsigned long int temp = 0;
 
   for(;;) {
     // Enable interrupts on this processor.
@@ -278,7 +297,9 @@ void scheduler(void) {
         continue;
       activeTickets += p->tickets;
     }
-    winner = rand() % activeTickets;
+    // winner = rand() % activeTickets;
+    winner = getRandomNumber(0, activeTickets); //rand() % activeTickets;
+
 
     temp = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
