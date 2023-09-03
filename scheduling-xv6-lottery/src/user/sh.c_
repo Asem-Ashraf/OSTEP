@@ -162,7 +162,7 @@ int main(void) {
       break;
     }
   }
-  // if (fork1() == 0) runcmd(parsecmd("t 10 &; t 20 &; t 30 &; psloop"));
+  if (fork1() == 0) runcmd(parsecmd("t 10 &; t 20 &; t 30 &; psloop"));
 
   // Read and run input commands.
   while (getcmd(buf, sizeof(buf)) >= 0) {

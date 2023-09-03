@@ -151,6 +151,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_t\
 	$U/_ps\
+	$U/_psloop\
 	# $U/_sizes\
 
 fs.img: mkfs/mkfs README.md $(UPROGS)
@@ -160,13 +161,40 @@ xv6.img: $K/bootblock $K/kernel fs.img
 	dd if=$K/bootblock of=xv6.img
 	dd if=$K/kernel of=xv6.img seek=1
 
--include $K/*.d $U/*.d
-
 clean:
 	rm -f */*.o */*.d */*.asm */*.sym $K/entryother \
 	$K/bootblock $U/initcode $U/initcode.out $K/kernel xv6.img fs.img mkfs/mkfs \
 	.gdbinit \
-	$(UPROGS)
+	$(UPROGS) \
+
+
+
+test-scheduler: $U/sh.c $U/sh.c_
+	@mv user/sh.c user/sh.c.tmp
+	@cp user/sh.c_ user/sh.c
+
+untest-scheduler: $U/sh.c $U/sh.c.tmp
+	@mv user/sh.c.tmp user/sh.c
+
+$U/sh.c.tmp: test-scheduler
+
+
+
+$K/kernel-test: $(OBJS) $U/initcode $K/entryother test-scheduler
+	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) -b binary $U/initcode $K/entryother
+	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
+	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
+
+
+fs-test.img: mkfs/mkfs README.md $(UPROGS) test-scheduler
+	./mkfs/mkfs fs.img README.md $(UPROGS)
+
+xv6-test.img: $K/bootblock $K/kernel fs-test.img test-scheduler
+	dd if=$K/bootblock of=xv6.img
+	dd if=$K/kernel of=xv6.img seek=1
+
+-include $K/*.d $U/*.d
+
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
@@ -186,6 +214,17 @@ QEMUOPTS = \
 
 qemu: $K/kernel fs.img xv6.img
 	$(QEMU) $(QEMUOPTS)
+
+qemu-test-scheduler: $K/kernel-test fs-test.img xv6-test.img test-scheduler $U/sh.c $U/sh.c.tmp
+	@echo "Running test-scheduler..."
+	@echo "Run the test for as much time as you want and then press Ctrl+A and then X to stop it."
+	@echo "The more you keep it running the more the test will be accurate."
+	@mv user/sh.c.tmp user/sh.c
+	$(QEMU) $(QEMUOPTS) > testval.txt
+	make clean
+
+graph: 
+	python3 graph.py
 
 qemu-gdb: $K/kernel fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
