@@ -221,7 +221,6 @@ qemu-test-scheduler: $K/kernel-test fs-test.img xv6-test.img test-scheduler $U/s
 	@echo "The more you keep it running the more the test will be accurate."
 	@mv user/sh.c.tmp user/sh.c
 	$(QEMU) $(QEMUOPTS) > testval.txt
-	make clean
 
 graph: 
 	python3 graph.py

@@ -22,5 +22,5 @@ gdb and lldb if you haven't already. On debian that is `sudo apt update && sudo 
 To test the lottery scheduler run `make clean; make qemu-test-scheduler` the kernel will be compiled and will start collecting data about the process. This is done by editing the `user/sh.c` program to run multiple process with different ticket counts and a looped version of the `ps` program to collect data of the running process over time. After qemu is closed, the `user/sh.c` code is returned to its original form.
 After about a minute or so of running qemu, manually press `Ctrl-a then x` to close qemu and save the collected data. The more you let qemu run the more data it will collect which will enhance the smoothness of the graph. To use the kernel normally, you will need to run `make clean` to reverse the effects of the test, otherwise, the shell will keep running `ps`.
 
-# Graph of Running Process
+# Graph of Running Processes
 To generate the graph run `make graph`. This will run a python script and will generate a `graph.png` file in the `../graph` directory
