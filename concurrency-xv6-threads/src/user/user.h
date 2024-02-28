@@ -7,6 +7,13 @@
 #include "kernel/stat.h"
 #include "kernel/types.h"
 #include "kernel/x86.h"
+#include "kernel/mmu.h"
+
+#define STATIC_LOCK_INITIALIZATION {0,0}
+typedef struct lock_t { 
+  int ticket;
+  int turn;
+} lock_t;
 
 // system calls
 int fork(void);
@@ -30,6 +37,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack);
+int join(void **stack);
 
 // ulib.c
 int stat(char*, struct stat*);
@@ -42,9 +51,16 @@ void fprintf(int, char*, ...);
 char* gets(char*, int max);
 uint strlen(char*);
 void* memset(void*, int, uint);
-void* malloc(uint);
-void free(void*);
-void* realloc(void*, uint);
 int atoi(const char*);
+int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2);
+int thread_join();
+void lock_init(lock_t*);
+void lock_acquire(lock_t *);
+void lock_release(lock_t *);
+
+// umalloc.c
+void* malloc(uint);
+void* realloc(void*, uint);
+void free(void*);
 
 #endif // XV6_USER_H

@@ -11,6 +11,21 @@ int sys_fork(void) {
   return fork();
 }
 
+int sys_clone(void) {
+  int fcn,arg1,arg2,stack;
+  argint(0, &fcn);
+  argint(1, &arg1);
+  argint(2, &arg2);
+  argint(3, &stack);
+  return clone((void*)fcn, (void*)arg1, (void*)arg2, (void*)stack);
+}
+
+int sys_join(void) {
+  int stack;
+  argint(0, &stack);
+  return join((void*) stack);
+}
+
 int sys_exit(void) {
   exit();
   return 0; // not reached

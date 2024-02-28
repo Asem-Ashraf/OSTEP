@@ -13,6 +13,8 @@ union header {
   Align x;
 };
 
+static lock_t alloclock = STATIC_LOCK_INITIALIZATION;
+
 typedef union header Header;
 
 static Header base;
@@ -74,6 +76,7 @@ void* malloc(uint nbytes) {
   uint nunits;
 
   nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
+  lock_acquire(&alloclock);
   if((prevp = freep) == 0) {
     base.s.ptr = freep = prevp = &base;
     base.s.size = 0;
@@ -88,10 +91,14 @@ void* malloc(uint nbytes) {
         p->s.size = nunits;
       }
       freep = prevp;
+      lock_release(&alloclock);
       return (void*) (p + 1);
     }
     if(p == freep)
       if((p = morecore(nunits)) == 0)
+      {
+        lock_release(&alloclock);
         return 0;
+      }
   }
 }

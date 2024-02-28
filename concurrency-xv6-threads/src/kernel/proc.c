@@ -46,8 +46,15 @@ found:
     p->state = UNUSED;
     return 0;
   }
+  /////// At this point, we have found a kernel stack.
+  /////// here we move the sp to the bottom of the stack.
   sp = p->kstack + KSTACKSIZE;
 
+  /////// Here we start to fill the stack from the bottom so we decrement then
+  /////// declare the that space to be something.
+  /////// Here, we declare the trapframe to be at the bottom of the stack.
+  /////// Right now, the trapframe is at the bottom of the kernel stack and
+  ///empty.
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*) sp;
@@ -152,6 +159,117 @@ int fork(void) {
   return pid;
 }
 
+int clone(void(*fcn)(void*,void*), void* arg1, void* arg2,void* stack) {
+  int i, pid;
+  struct proc* newThread;
+
+  //// Allocates a kernel stack for this thread and other stuff
+  if((newThread = allocproc()) == 0)
+    return -1;
+
+  /////// now the new thread will have the same physical memory as the parent
+  newThread->pgdir = proc->pgdir;
+
+  //// same memory size
+  newThread->sz = proc->sz;
+  //// the parent process is the process that created this thread
+  newThread->parent = proc;
+  //// copies the content of the parent's trap frame.
+  *newThread->tf = *proc->tf;
+
+  /////// This is the stack pointer of the new thread
+  newThread->tf->esp = (uint) stack + PGSIZE - 4;/// now, esp points to where arg2 should be. Now, it is empty(garbage)
+  newThread->tf->ebp = newThread->tf->esp; /// Setting the stack base pointer.
+  
+  /////// put the arguments on the new thread stack starting by the last
+  *(uint*)(newThread->tf->esp) = (uint) arg2;
+
+  newThread->tf->esp -= 4;
+  *(uint*)(newThread->tf->esp) = (uint) arg1;
+
+  newThread->tf->esp -= 4;
+  *(uint*)(newThread->tf->esp) = 0xffffffff; // fake return address, this is
+  // just a random number that is never gonna be used, it is at the top of the
+  // stack when the thread function starts executing. The function expects it to
+  // be there due to x86 calling conventions.
+
+  ////// the new thread will start executing from the function fcn
+  newThread->tf->eip = (uint) fcn;
+
+  // Clear %eax so that fork returns 0 in the child.
+  //// Not needed in the thread case.
+  newThread->tf->eax = 0;
+
+  /// my addition to proc struct
+  newThread->stackbegin = stack;
+
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      //// fileduplication
+      newThread->ofile[i] = filedup(proc->ofile[i]);
+
+  //// the new thread will have the same current working directory as the parent
+  //// This is a way to normally assign the cwd variable while also increase the
+  //// number of times it is referenced
+  //// Inode dubplication
+  newThread->cwd = idup(proc->cwd);
+
+  safestrcpy(newThread->name, proc->name, sizeof(proc->name));
+
+  pid = newThread->pid;
+
+  // lock to force the compiler to emit the np->state write last.
+  acquire(&ptable.lock);
+  newThread->state = RUNNABLE;
+  release(&ptable.lock);
+
+  return pid;
+}
+
+int join(void** stack) {
+  struct proc* p;
+  int foundproc, pid;
+
+  acquire(&ptable.lock);
+  foundproc = 0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    /// looking for a process that has that stack as its stackbegin and has the
+    /// current process as its parent
+    if((p->stackbegin!= *stack) || (p->parent != proc))
+      continue;
+    foundproc = 1;
+    break;
+  }
+  /// Child thread with `stack` as its stack beginning was not found.
+  /// maybe wrong stack address.
+  /// anyway, return -1
+  if(!foundproc || proc->killed) {
+    release(&ptable.lock);
+    return -1;
+  }
+
+  /// The child thread was found.
+  for(;;) {
+    /// The child thread has exited.
+    if(p->state == ZOMBIE) {
+      /// reclaim the kernel stack
+      pid = p->pid;
+      kfree(p->kstack);
+      p->kstack = 0;
+      /// reclaim the process
+      p->state = UNUSED;
+      p->pid = 0;
+      p->parent = 0;
+      p->name[0] = 0;
+      p->killed = 0;
+      release(&ptable.lock);
+      return pid;
+    }
+    /// if the child thread didn't exit yet, main thread sleep until child exits.
+    sleep(proc, &ptable.lock);
+  }
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -181,10 +299,15 @@ void exit(void) {
   wakeup1(proc->parent);
 
   // Pass abandoned children to init.
+  /// for all process running
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    /// If the current process that wants to exit is another process's parent
     if(p->parent == proc) {
+      /// give the child away for the initproc
       p->parent = initproc;
+      /// set its state to zombie
       if(p->state == ZOMBIE)
+        /// wake up initproc, all it does is it calls wait to force kill all its zombie children
         wakeup1(initproc);
     }
   }
@@ -402,12 +525,13 @@ int kill(int pid) {
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
 void procdump(void) {
-  static char* states[] = {[UNUSED] "unused",
-      [EMBRYO] "embryo",
-      [SLEEPING] "sleep ",
-      [RUNNABLE] "runble",
-      [RUNNING] "run   ",
-      [ZOMBIE] "zombie"};
+  static char* states[] = {
+    [UNUSED] "unused",
+    [EMBRYO] "embryo",
+    [SLEEPING] "sleep ",
+    [RUNNABLE] "runble",
+    [RUNNING] "run   ",
+    [ZOMBIE] "zombie"};
   int i;
   struct proc* p;
   char* state;
