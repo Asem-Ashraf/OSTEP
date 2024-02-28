@@ -140,6 +140,9 @@ UPROGS=\
 	$U/_usertests\
 	$U/_wc\
 	$U/_zombie\
+	$U/_testmalloc\
+	$U/_testlock\
+	$U/_testmt\
 
 fs.img: mkfs/mkfs README.md $(UPROGS)
 	./mkfs/mkfs fs.img README.md $(UPROGS)
@@ -164,7 +167,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	else echo "-s -p $(GDBPORT)"; fi)
 
 ifndef CPUS
-CPUS := 1
+CPUS := 5
 endif
 
 QEMUOPTS = \

@@ -13,16 +13,20 @@ int sys_fork(void) {
 
 int sys_clone(void) {
   int fcn,arg1,arg2,stack;
-  argint(0, &fcn);
-  argint(1, &arg1);
-  argint(2, &arg2);
-  argint(3, &stack);
+  int rc = argint(0, &fcn);
+  rc |= argint(1, &arg1);
+  rc |= argint(2, &arg2);
+  rc |= argint(3, &stack);
+  if (rc != 0)
+    return rc;
   return clone((void*)fcn, (void*)arg1, (void*)arg2, (void*)stack);
 }
 
 int sys_join(void) {
   int stack;
-  argint(0, &stack);
+  int rc = argint(0, &stack);
+  if (rc != 0)
+    return rc;
   return join((void*) stack);
 }
 
