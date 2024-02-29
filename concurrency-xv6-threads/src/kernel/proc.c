@@ -233,16 +233,14 @@ int join(void** stack) {
   acquire(&ptable.lock);
   foundproc = 0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-    /// looking for a process that has that stack as its stackbegin and has the
-    /// current process as its parent
-    if((p->stackbegin!= *stack) || (p->parent != proc))
+    /// looking for a process that has the same page table (address space) and
+    /// has the current caller process as its parent
+    if((p->parent != proc) || (p->pgdir != proc->pgdir))
       continue;
     foundproc = 1;
     break;
   }
-  /// Child thread with `stack` as its stack beginning was not found.
-  /// maybe wrong stack address.
-  /// anyway, return -1
+
   if(!foundproc || proc->killed) {
     release(&ptable.lock);
     return -1;
@@ -262,6 +260,8 @@ int join(void** stack) {
       p->parent = 0;
       p->name[0] = 0;
       p->killed = 0;
+      // assign the stackbegin by reference
+      *stack = p->stackbegin;
       release(&ptable.lock);
       return pid;
     }

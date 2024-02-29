@@ -116,57 +116,17 @@ void lock_release(lock_t* lock) {
   lock->turn = lock->turn + 1;
 }
 
-
-
-#define MAX_THREAD_COUNT 100
-
-static void* items[MAX_THREAD_COUNT];
-static int front = -1;
-static int rear = -1;
-
-#define isFull() ((rear + 1) % MAX_THREAD_COUNT== front)
-#define isEmpty() (front == -1)
-
-// Adding an element to the queue
-static inline int enqueue(void* value) {
-  if(isFull())
-    return -1;
-  if(front == -1)
-    front = 0;
-  rear = (rear + 1) % MAX_THREAD_COUNT;
-  items[rear] = value;
-  return 0;
-}
-
-static inline int dequeue(void** stack) {
-  if(isEmpty())
-    return -1;
-  *stack = (void*) items[front];
-  if(front == rear) {
-    // Queue has only one item, reset queue after removal.
-    front = -1;
-    rear = -1;
-  } else {
-    front = (front + 1) % MAX_THREAD_COUNT;
-  }
-  return 0;
-}
-
 int thread_create(void (*start_routine)(void*, void*), void* arg1, void* arg2) {
   // TODO: palloc is a page-aligned page allocator
-  // currently using malloc without any alignment
+  // currently using malloc to get a page without any alignment guarantee
   void* stack = malloc(PGSIZE);
-  // push this stack value onto a queue to keep track of threads this is because
-  // the thread_join() uses these stack pointers
-  int rc = enqueue(stack);
-  rc |= clone(start_routine, arg1, arg2, stack);
-  return rc;
+  return clone(start_routine, arg1, arg2, stack);
 }
 
 int thread_join() {
+  // a stack passed by reference to join. Join assigns it to the correct stack.
   void* stack;
-  int rc = dequeue(&stack);
-  rc |= join(&stack);
+  int rc = join(&stack);
   free(stack);
   return rc;
 }
